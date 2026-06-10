@@ -1,0 +1,48 @@
+{
+	"temperature":
+	{
+		"nencodings_per_station": 20,
+		"nencodings_per_lead_time": 10,
+
+		"encoder_features": 32,
+		"encoder_nattention_blocks": 3,
+		"encoder_nheads": 1,		
+		"encoder_output_features": 32,
+
+		"marginal_internal_features": 128,
+
+		"joint_incoming_features": 32,
+		"joint_internal_features": 32
+
+	},
+	"precipitation":
+	{
+		"nencodings_per_station": 20,
+		"nencodings_per_lead_time": 10,
+
+		"encoder_features": 32,
+		"encoder_nattention_blocks": 3,
+		"encoder_nheads": 1,
+		"encoder_output_features": 32,
+
+		"marginal_internal_features": 128,
+
+		"joint_incoming_features": 32,
+		"joint_internal_features": 32
+	},
+	"wind":
+	{
+		"nencodings_per_station": 20,
+		"nencodings_per_lead_time": 10,
+
+		"encoder_features": 32,
+		"encoder_nattention_blocks": 3,
+		"encoder_nheads": 1,
+		"encoder_output_features": 32,
+
+		"marginal_internal_features": 128,
+
+		"joint_incoming_features": 32,
+		"joint_internal_features": 32
+	}
+}
