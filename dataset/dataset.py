@@ -41,41 +41,10 @@ class Dataset:
         self.reduce_members = False
         self.importance_sampling = False
 
-        # Compute obervations weights
-
     def set_batch_size(self, batch_size: int):
 
         self.length = math.ceil(self.indices.shape[-1]/batch_size) 
         self.batch_size = batch_size
-
-    def set_importance_sampling(self, variable: str, weights: Optional[torch.Tensor] = None):
-
-        self.importance_sampling = True 
-
-        match variable:
-
-            case 'precipitation' | 'wind':
-
-                weights: List[torch.Tensor] = []
-
-                for i in range(self.y.shape[0]):
-
-                    #daily_prec: torch.Tensor = (self.y[i, ..., 0] > 0).sum(dim = -1).type(torch.float32)
-                    #daily_prec: torch.Tensor = self.x[i, ..., 22].mean(dim = (-1, -2))
-                    daily_prec: torch.Tensor = self.y[i, ..., 0].nanmean(dim = -1)
-
-                    hv, he = torch.histogram(daily_prec[~daily_prec.isnan()], bins = torch.arange(20, dtype = torch.float32, device = daily_prec.device))
-                    hv = 1/(hv + 1e-8)
-
-                    daily_prec_shape: torch.Size = daily_prec.shape
-                    _weights: torch.Tensor = hv[(daily_prec[:, None] >= he[1:][None]).sum(dim = 1).clamp(max = len(hv) - 1)].view(daily_prec_shape)
-                    _weights /= _weights.sum()
-                    weights.append(_weights.cumsum(dim = -1))
-
-                self.weights: torch.Tensor = torch.stack(weights)
-             
-            case 'wind':
-                pass
 
     def __getitem__(self, i: int):
        
@@ -87,14 +56,6 @@ class Dataset:
             i: torch.Tensor = self.indices[:, i0:i1] 
 
         else:
-
-            #_i0: int = int(self.batch_size*0.2)
-            #_i1: int = self.batch_size - _i0
-            #i_stations_zero: torch.Tensor = self.importance_distribution_zero_stations[torch.randint(low = 0, high = len(self.importance_distribution_zero_stations), size = (_i0,))]
-            #i_stations_posi: torch.Tensor = self.importance_distribution_posi_stations[torch.randint(low = 0, high = len(self.importance_distribution_posi_stations), size = (_i1,))]
-            #i_run_time_zero: torch.Tensor = (self.importance_i0[i_stations_zero] < torch.rand((_i0, 1))).sum(dim = -1).clamp(min = 0, max = self.y.shape[1] - 1)
-            #i_run_time_posi: torch.Tensor = (self.importance_i1[i_stations_posi] < torch.rand((_i1, 1))).sum(dim = -1).clamp(min = 0, max = self.y.shape[1] - 1)
-            #i: torch.Tensor = torch.stack([torch.cat([i_stations_zero, i_stations_posi]), torch.cat([i_run_time_zero, i_run_time_posi])], dim = 0)[:, torch.rand(self.batch_size).argsort()]
 
             i_stations: torch.Tensor = torch.randint(low = 0, high = self.y.shape[0], size = (self.batch_size,))
             i_run_time: torch.Tensor = (self.weights[i_stations] < torch.rand((len(i_stations), 1))).sum(dim = -1).clamp(min = 0, max = self.y.shape[1] - 1)
@@ -160,14 +121,7 @@ def load_forecast_data(path: str,
             y = y[..., 1][..., None]
             y[y < 0.0] = 0.0
 
-            # Set station 30 observations to NaN since
-            # the training dataset has no recorded precipitation
-            # for that station
-            #y[30] = torch.nan
-            #y[20] = torch.nan
-
             y[37] = torch.nan
-            #y[y*1000 < 0.2] = 0.0
 
         case "wind":
             y = y[..., 2][..., None]
@@ -198,7 +152,6 @@ def load_reforecast_data(path: str,
             # the training dataset has no recorded precipitation
             # for that station
             y[37] = torch.nan
-            #y[y*1000 < 0.2] = 0.0
 
         case "wind":
             y = y[..., 2][..., None]
@@ -208,17 +161,11 @@ def load_reforecast_data(path: str,
 
     return m, (t, x, y), (idx_train, idx_valid, idx_test), (_idx_train, _idx_valid, _idx_test)
 
-def apply_residuals(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-
-    print('Residuals -> ', x.shape, y.shape)
-    return y - x.mean(dim = -1, keepdim = True)
-
 def load_reforecast_train(path: str,
                           loader: Callable[str, str],
                           batch_size: int = 256,
                           device: str = "cpu",
-                          prefix: str = "temperature",
-                          residuals: Optional[int] = None) -> Tuple[Dict, Dataset]:
+                          prefix: str = "temperature") -> Tuple[Dict, Dataset]:
 
     m, (t, x, y), (_, idx_valid, _), (_idx_train, _, _) = loader(path, prefix)
 
@@ -227,17 +174,13 @@ def load_reforecast_train(path: str,
 
     print('Train data: ', x_train.shape, y_train.shape)
 
-    if not (residuals is None):
-        y_train = apply_residuals(x_train[..., residuals], y_train)
-
     return m, Dataset(t_train, x_train, y_train, batch_size = batch_size, device = device)
 
 def load_reforecast_valid(path: str,
                           loader: Callable[str, str],
                           batch_size: int = 256,
                           device: str = "cpu",
-                          prefix: str = "temperature",
-                          residuals: Optional[int] = None) -> Tuple[Dict, Dataset]:
+                          prefix: str = "temperature") -> Tuple[Dict, Dataset]:
     
     m, (t, x, y), (_, _, idx_test), (_, _idx_valid, _) = loader(path, prefix)
 
@@ -246,17 +189,13 @@ def load_reforecast_valid(path: str,
 
     print('Valid data: ', x_valid.shape, y_valid.shape)
 
-    if not (residuals is None):
-        y_valid = apply_residuals(x_valid[..., residuals], y_valid)
-
     return m, Dataset(t_valid, x_valid, y_valid, batch_size = batch_size, device = device)
 
 def load_reforecast_test(path: str,
                          loader: Callable[str, str],
                          batch_size: int = 256,
                          device: str = "cpu",
-                         prefix: str = "temperature",
-                         residuals: Optional[int] = None) -> Tuple[Dict, Dataset]:
+                         prefix: str = "temperature") -> Tuple[Dict, Dataset]:
     
     m, (t, x, y), (_, _, _), (_, _, _idx_test) = loader(path, prefix)
 
@@ -264,12 +203,9 @@ def load_reforecast_test(path: str,
 
     print('Test data: ', x_test.shape, y_test.shape)
 
-    if not (residuals is None):
-        y_test = apply_residuals(x_test[..., residuals], y_test)
-
     return m, Dataset(t_test, x_test, y_test, batch_size = batch_size, device = device)
 
-def reforecast_standardize(target: Dataset, source: Dataset, prefix: str = "temperature", residuals: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+def reforecast_standardize(target: Dataset, source: Dataset, prefix: str = "temperature") -> Tuple[torch.Tensor, torch.Tensor]:
 
     xmu, xsd = source.x.mean(dim = (0, 1, 2, 3), keepdim = True), source.x.std(dim = (0, 1, 2, 3), keepdim = True)
 
@@ -282,13 +218,7 @@ def reforecast_standardize(target: Dataset, source: Dataset, prefix: str = "temp
         case 'temperature':
             target.y = (target.y - ymu)/ysd
         case 'precipitation' | 'wind':
-
-            if not residuals:
-                target.y[target.y < 0.0] = 0.0
-                target.y = torch.log(target.y/ysd + 1.0)
-
-            else:
-                target.y = (target.y - ymu)/ysd
+            target.y = (target.y - ymu)/ysd
 
         case _:
             print(f"Dataset {prefix} standardization not supported")

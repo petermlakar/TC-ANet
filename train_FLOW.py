@@ -50,20 +50,10 @@ prefix: str = config['variable']
 match prefix:
     case 'temperature':
         censored: bool = False
-        target_field_index: int = None #0
-        residuals: bool = not (target_field_index is None)
-    case 'precipitation':
+    case 'precipitation' | 'wind':
         censored: bool = True
-        target_field_index: int = None
-        residuals: bool = False
-    case 'wind':
-        censored: bool = True
-        target_field_index: int = None #21
-        residuals: bool = not (target_field_index is None)
     case _:
         censored: bool = False
-        target_field_index: int = None
-        residuals: bool = False
 
 m, dataset_train = load_reforecast_train(dataset_path, load_reforecast_data, batch_size, device, prefix)
 _, dataset_valid = load_reforecast_valid(dataset_path, load_reforecast_data, batch_size, device, prefix)
@@ -71,8 +61,8 @@ _, dataset_valid = load_reforecast_valid(dataset_path, load_reforecast_data, bat
 #dataset_train.set_importance_sampling(prefix)
 #dataset_valid.set_importance_sampling(prefix)
 
-reforecast_standardize(dataset_valid, dataset_train, prefix, residuals = residuals)
-_, _, _, ysd = reforecast_standardize(dataset_train, dataset_train, prefix, residuals = residuals)
+reforecast_standardize(dataset_valid, dataset_train, prefix)
+_, _, _, ysd = reforecast_standardize(dataset_train, dataset_train, prefix)
 number_of_stations: int = dataset_train.x.shape[0]
 
 forecast_encoder: ForecastEncoder = ForecastEncoder(number_of_forecast_fields = dataset_train.x.shape[-1],

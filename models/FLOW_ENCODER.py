@@ -6,6 +6,24 @@ from typing import Tuple, List, Optional
 import math
 
 def get_lead_time_encodings(nlead: int, size: int):
+    """
+    Generate lead-time embeddings using a correlated random walk.
+
+    Parameters
+    ----------
+    nlead : int
+        Number of lead times to create encodings for.
+    size : int
+        Dimensionality of each lead-time encoding vector.
+
+    Returns
+    -------
+    torch.Tensor
+        Tensor of shape [nlead, size] containing lead-time encodings.
+        Consecutive lead times are generated from the previous encoding
+        with added Gaussian noise, producing smooth transitions between
+        neighboring lead times.
+    """
 
     e: torch.Tensor = torch.zeros((nlead, size), dtype = torch.float32)
     a: float = 0.5 
@@ -21,12 +39,40 @@ def get_lead_time_encodings(nlead: int, size: int):
 class DropoutInf(nn.Module):
 
     def __init__(self, p: float = 0.1):
+        """
+        Create a dropout layer that replaces selected values with -inf.
+
+        Parameters
+        ----------
+        p : float, optional
+            Probability of masking an element. Default is 0.1.
+
+        Notes
+        -----
+        This layer is intended for use before a softmax operation, where
+        subtracting infinity effectively removes elements from attention.
+        """
 
         super().__init__()
 
         self.p: float = p
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply dropout by replacing randomly selected values with -inf.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            Tensor with randomly selected values replaced by -inf when
+            the module is in training mode. Returns the input unchanged
+            during evaluation.
+        """
 
         if self.training:
 
@@ -42,6 +88,19 @@ class MultiheadAttentionEncoder(nn.Module):
                  number_of_features: int,
                  number_of_heads: int = 4,
                  dropout: float = 0.1):
+        """
+        Multi-head attention layer using externally supplied attention scores.
+
+        Parameters
+        ----------
+        number_of_features : int
+            Feature dimension of the input and output tensors.
+        number_of_heads : int, optional
+            Number of attention heads. Must evenly divide
+            number_of_features.
+        dropout : float, optional
+            Probability used by DropoutInf to mask attention logits.
+        """
         super().__init__()
 
         assert (number_of_features % number_of_heads) == 0
@@ -58,6 +117,23 @@ class MultiheadAttentionEncoder(nn.Module):
     def forward(self,
                 v: torch.Tensor,
                 e: torch.Tensor) -> torch.Tensor:
+        """
+        Apply multi-head attention using precomputed attention logits.
+
+        Parameters
+        ----------
+        v : torch.Tensor
+            Value tensor of shape [batch, sequence, features].
+        e : torch.Tensor
+            Attention logits tensor. The final dimension is normalized
+            with softmax to produce attention weights.
+
+        Returns
+        -------
+        torch.Tensor
+            Attention output tensor with the same feature dimension as
+            the input.
+        """
        
         V = self.v_weights(v)
         V = V.view(V.shape[0], V.shape[1], self.number_of_heads, V.shape[2]//self.number_of_heads).swapaxes(-2, -3)
@@ -72,6 +148,19 @@ class Encoder(nn.Module):
                  number_of_features: int,
                  number_of_heads: int,
                  dropout: float):
+        """
+        Transformer-style encoder block consisting of attention and
+        a residual feed-forward layer.
+
+        Parameters
+        ----------
+        number_of_features : int
+            Feature dimension of the hidden representation.
+        number_of_heads : int
+            Number of attention heads.
+        dropout : float
+            Attention dropout probability.
+        """
 
         super().__init__()
 
@@ -81,6 +170,22 @@ class Encoder(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                 e: torch.Tensor) -> torch.Tensor:
+        """
+        Apply attention and feed-forward residual updates.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input feature tensor.
+        e : torch.Tensor
+            Attention logits supplied to the attention layer.
+
+        Returns
+        -------
+        torch.Tensor
+            Updated feature tensor after attention and residual
+            feed-forward transformations.
+        """
 
         x = x + self.atn(x, e)
 
@@ -113,6 +218,33 @@ class ForecastEncoder(nn.Module):
                  number_of_output_features: int,
                  number_of_encoders: int,
                  number_of_heads: int):
+        """
+        Forecast encoder that aggregates ensemble forecasts across lead
+        times using learned attention mechanisms.
+
+        Parameters
+        ----------
+        number_of_forecast_fields : int
+            Number of forecast variables provided as input.
+        number_of_input_lead_times : int
+            Number of lead times available in the input forecast.
+        number_of_output_lead_times : int
+            Number of lead times to generate representations for.
+        number_of_stations : int
+            Total number of stations in the dataset.
+        nencodings_per_station : int
+            Dimension of the station embedding.
+        nencodings_per_lead_time : int
+            Dimension of the lead-time embedding.
+        number_of_features : int
+            Internal feature dimension used by encoder blocks.
+        number_of_output_features : int
+            Size of the final output representation.
+        number_of_encoders : int
+            Number of encoder blocks to stack.
+        number_of_heads : int
+            Number of attention heads used in each encoder block.
+        """
 
         super().__init__()
 
@@ -136,10 +268,6 @@ class ForecastEncoder(nn.Module):
                                                     nn.SiLU(),
                                                     nn.Linear(32, 1))
 
-        #attention_identity: torch.Tensor = torch.eye(number_of_input_lead_times, dtype = torch.float32)
-        #attention_identity[attention_identity < 1] = -torch.inf
-        #self.attention_identity: nn.Parameter = nn.Parameter(attention_identity, requires_grad = False)
-
         self.encoders = nn.ModuleList()
         for i in range(number_of_encoders):
             self.encoders.append(Encoder(number_of_features, number_of_heads, 0.1))
@@ -152,6 +280,24 @@ class ForecastEncoder(nn.Module):
     def get_encodings(self,
                       day_of_year: torch.Tensor,
                       station_index: torch.Tensor) -> torch.Tensor:
+        """
+        Construct station and seasonal encodings.
+
+        Parameters
+        ----------
+        day_of_year : torch.Tensor
+            Tensor containing normalized day-of-year values. Shape:
+            [batch, ...].
+        station_index : torch.Tensor
+            Station indices for each sample. Shape: [batch].
+
+        Returns
+        -------
+        torch.Tensor
+            Encoding tensor of shape
+            [batch, number_of_output_lead_times, features]
+            containing cyclic seasonal encodings and station embeddings.
+        """
 
         # day_of_year, station_index: [batch]
 
@@ -169,6 +315,29 @@ class ForecastEncoder(nn.Module):
                 forecast: torch.Tensor,
                 day_of_year: torch.Tensor,
                 station_index: torch.Tensor) -> torch.Tensor:
+        """
+        Encode ensemble forecast information into a learned feature space.
+
+        Parameters
+        ----------
+        forecast : torch.Tensor
+            Forecast tensor containing ensemble member predictions.
+            Expected dimensions include batch, lead time, member,
+            and forecast-variable axes.
+        day_of_year : torch.Tensor
+            Normalized day-of-year values used to generate seasonal
+            encodings.
+        station_index : torch.Tensor
+            Integer station identifiers used to retrieve station
+            embeddings.
+
+        Returns
+        -------
+        torch.Tensor
+            Encoded forecast representation of shape
+            [batch, number_of_output_lead_times,
+             number_of_output_features].
+        """
 
         batch: int = forecast.shape[0]
         member: int = forecast.shape[2]
@@ -185,7 +354,6 @@ class ForecastEncoder(nn.Module):
 
 
         e: torch.Tensor = self.encodings_to_attention(e_predictors)[:, None].swapaxes(1, -1)[..., 0]
-        #e = e + self.seed_attn[None, None]
         
         self.e = e
 
@@ -195,4 +363,3 @@ class ForecastEncoder(nn.Module):
             x = f(x, e)
 
         return self.encoder_out(x)
-

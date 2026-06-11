@@ -41,35 +41,25 @@ prefix: str = config['variable']
 match prefix:
     case 'temperature':
         censored: bool = False
-        target_field_index: int = None #0
-        residuals: bool = not (target_field_index is None)
-    case 'precipitation':
+    case 'precipitation' | 'wind':
         censored: bool = True
-        target_field_index: int = None
-        residuals: bool = not (target_field_index is None)
-    case 'wind':
-        censored: bool = True 
-        target_field_index: int = None #21
-        residuals: bool = not (target_field_index is None)
     case _:
         censored: bool = False
-        target_field_index: int = None
-        residuals: bool = False
 
 m, dataset_train = load_reforecast_train(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
 
 match dataset_type:
     
     case "train":
-        xmu, xsd, mu, sd = reforecast_standardize(dataset_train, dataset_train, prefix, residuals = residuals)
+        xmu, xsd, mu, sd = reforecast_standardize(dataset_train, dataset_train, prefix)
         dataset = dataset_train
     case "valid":
         _, dataset_valid = load_reforecast_valid(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
-        xmu, xsd, mu, sd = reforecast_standardize(dataset_valid, dataset_train, prefix, residuals = residuals)
+        xmu, xsd, mu, sd = reforecast_standardize(dataset_valid, dataset_train, prefix)
         dataset = dataset_valid
     case "test":
         _, dataset_test = load_reforecast_test(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
-        xmu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix, residuals = residuals)
+        xmu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix)
         dataset = dataset_test
     case "testf":
         _, dataset_test = load_forecast_data(dataset_path, batch_size, device, prefix)
@@ -79,7 +69,6 @@ match dataset_type:
         raise RuntimeError(f'Invalid dataset type {dataset_type}')
 
 dataset.prediction = True
-#dataset.shuffle()
 
 number_of_stations: int = dataset.x.shape[0]
 number_of_run_times: int = dataset.x.shape[1]
@@ -104,8 +93,6 @@ model_weights = model_weights.to(device)
 
 prediction_type: str = config['predictionType']
 
-number_of_members: int = 101
-
 number_of_steps: int = 100
 number_of_samples: int = number_of_members//len(models_regression)
 number_of_quantiles: int = number_of_members
@@ -119,10 +106,6 @@ match prediction_type:
         raise RuntimeError(f'Invalid prediction type {prediction_type}')
 
 mu, sd = mu.squeeze(), sd.squeeze()
-
-#importance_file: str = 'importance_idx_precipitation'
-#importance_index: torch.Tensor = torch.load(importance_file, weights_only = True).abs().squeeze().argsort(descending = True).to('cpu')
-#dataset.x = dataset.x[..., importance_index]
 
 def generate_samples_marginal(x: torch.Tensor, 
                               d: torch.Tensor, 
@@ -168,27 +151,6 @@ def generate_samples_joint(x: torch.Tensor,
 
     return samples.detach().cpu()
 
-def generate_samples_joint_resample(x: torch.Tensor, d: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
-
-    embeddings: List[torch.Tensor] = [model.get_embeddings(x, d, s) for model in models_regression]
-
-    q: torch.Tensor = generate_samples_marginal(x, d, s, embeddings)
-    s: torch.Tensor = torch.zeros_like(q)
-    b: torch.Tensor = -torch.ones((s.shape[0],), dtype = torch.float32)
-    
-    for r in range(50):
-
-        samples: torch.Tensor = generate_samples_joint(x, d, s, embeddings)[..., 0]
-
-        score: torch.Tensor = (q - samples.sort(dim = -1)[0]).abs().flatten(start_dim = -2).max(dim = -1)[0]
-
-        i: torch.Tensor = torch.logical_or(b == -1, score < b)
-
-        b[i] = score[i]
-        s[i] = samples[i]
-        
-    return s[..., None]
-
 def generate_samples_joint_ecc(x: torch.Tensor, 
                                d: torch.Tensor, 
                                s: torch.Tensor,
@@ -220,31 +182,19 @@ for i in tqdm(range(len(dataset))):
 
         match prediction_type:
             case 'joint':
-                #samples: torch.Tensor = generate_samples_joint_ecc(x, d, s, False)
-                samples: torch.Tensor = generate_samples_joint(x, d, s)
-
+                samples: torch.Tensor = generate_samples_joint_ecc(x, d, s, False)
             case 'marginal':
                 samples: torch.Tensor = generate_samples_marginal(x, d, s)[..., None]
 
     match prefix:
         case 'temperature':
             samples = samples*sd + mu
-
-            if residuals:
-                samples += (x[..., target_field_index].mean(dim = -1).cpu()[..., None, None])*xsd[..., target_field_index].squeeze() + xmu[..., target_field_index].squeeze()
-
         case 'precipitation':
             samples[samples < 0.0] = 0.0
             samples = (samples.exp() - 1.0)*sd
         case 'wind':
-            if not residuals:
-                samples[samples < 0.0] = 0.0
-                samples = (samples.exp() - 1.0)*sd
-            else:
-                samples = samples*sd + mu
-                samples += x[..., target_field_index].mean(dim = -1).cpu()[..., None, None]*xsd[..., target_field_index].squeeze() + xmu[..., target_field_index].squeeze()
-
-                samples[samples < 0.0] = 0.0
+            samples[samples < 0.0] = 0.0
+            samples = (samples.exp() - 1.0)*sd
         case _:
             raise RuntimeError(f'Denormalization not implemented for this variable {prefix}')
 

@@ -24,11 +24,10 @@ torch.autograd.set_detect_anomaly(True)
 
 config: Dict[str, str] = json.load(open(join(sys.argv[1], "config.json"), "r"))
 
-device: str = 'cuda:0'
+device: str = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 dataset_path: str = config['dataset_path'] 
 output_path: str = config['output_path'] 
 experiment_name: str = f"{config['train_experiment_name']}_{int(datetime.now(UTC).timestamp())}_{random.randint(0, 1000)}"
-#experiment_name: str = f"mbm_wind_{int(datetime.now(UTC).timestamp())}_{random.randint(0, 1000)}"
 output_path: str = join(output_path, experiment_name)
 
 write_to_file: bool = True 

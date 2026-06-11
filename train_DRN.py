@@ -19,11 +19,7 @@ import random
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from models.DRN import Model
-#from models.ANET2 import Model
 from models.BERN import ModelMarginal
-#from models.CMB_MARGINAL import ModelMarginal, Student
-
-#torch.autograd.set_detect_anomaly(True)
 
 config: Dict[str, str] = json.load(open(join(sys.argv[1], "config.json"), "r"))
 
@@ -64,11 +60,7 @@ _, _, _, ysd = reforecast_standardize(dataset_valid, dataset_train, prefix)
 reforecast_standardize(dataset_train, dataset_train, prefix)
 number_of_stations: int = dataset_train.x.shape[0]
 
-#if prefix == 'precipitation' | prefix == 'wind':
 model_marginal: ModelMarginal = ModelMarginal(positive_support = prefix == 'wind', monotone = True, censored = prefix == 'precipitation' or prefix == 'wind')
-#model_marginal: ModelMarginal = ModelMarginal(number_of_blocks = 1,
-#                                              number_of_knots  = 10,
-#                                              base_type = 0)
 
 model_marginal.censored = prefix == 'precipitation' or prefix == 'wind'
 

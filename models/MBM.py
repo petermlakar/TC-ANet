@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.jit as jit
-from torch.distributions import Gamma
 
 from typing import Tuple, List
 

@@ -108,10 +108,6 @@ model_size: int = sum([p.numel() for p in model.parameters() if p.requires_grad]
 
 print(f'Number of parameters: {model_size}')
 
-exit()
-
-#model.load_state_dict(_model.state_dict())
-
 training_stage: int = 0
 model.freeze_joint()
 

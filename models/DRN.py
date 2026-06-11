@@ -36,9 +36,7 @@ class Model(nn.Module):
                                nn.ReLU(),
                                nn.Linear(number_of_features, number_of_features),
                                nn.ReLU(),
-                               nn.Linear(number_of_features, 64),
-                               nn.ReLU(),
-                               nn.Linear(64, model_marginal.number_of_required_parameters))
+                               nn.Linear(number_of_features, model_marginal.number_of_required_parameters))
 
         self.model_marginal = model_marginal
         self.model_marginal.censored = censored
