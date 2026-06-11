@@ -1,0 +1,18 @@
+{
+	"dataset_path": "/home/pmlakar/Documents/paper2026/ANET3-main/dataset",
+	"output_path": "/home/pmlakar/Documents/paper2026/ANET3-main/outputs",
+	"evaluation_path": "",
+
+	"train_experiment_name": "anet_temperature",
+	"predict_experiment_name": "",
+
+	"datasetType": "testf",
+	"predictionType": "joint",
+	
+	"variable": "temperature",
+
+	"evaluation_models": 
+	[
+		{"type": "ANet", "modelFolder": "", "label": "", "colorIndex": 1, "markerIndex": 1, "predictionType": "joint"}
+	]
+}
