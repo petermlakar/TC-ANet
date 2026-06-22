@@ -94,11 +94,11 @@ match prefix:
 
 models: List[Dict] = [{"type": mdl["type"], 
                        "label": mdl["label"], 
-                       'modelPath': join(config['output_path'], mdl['modelFolder']),
-                       'colorIndex': mdl['colorIndex'],
-                       'markerIndex': mdl['markerIndex'], 
+                       'modelPath': join(config['output_path'], mdl['model_folder']),
+                       'colorIndex': mdl['color_index'],
+                       'markerIndex': mdl['marker_index'], 
                        'predictions': None,
-                       'predictionType': mdl['predictionType']} for mdl in config["evaluation_models"]]
+                       'predictionType': mdl['prediction_type']} for mdl in config["evaluation_models"]]
 
 models.append({'type': 'ECMWF', 'label': 'ECMWF', 'model_path': None, 'predictions': None, 'colorIndex': 0, 'markerIndex': 0})
 

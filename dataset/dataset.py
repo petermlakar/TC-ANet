@@ -95,9 +95,9 @@ class Dataset:
 
 def load_data(path: str, postfix: str = "training", prefix: str = "temperature") -> Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor]:
     
-    t: torch.Tensor = torch.load(join(path, f"time_{postfix}_temperature.dst"), weights_only = False)
-    x: torch.Tensor = torch.load(join(path, f"forecasts_{postfix}_temperature.dst"), weights_only = False)
-    y: torch.Tensor = torch.load(join(path, f"observations_{postfix}_temperature.dst"), weights_only = False)
+    t: torch.Tensor = torch.load(join(path, f"time_{postfix}.dst"), weights_only = False)
+    x: torch.Tensor = torch.load(join(path, f"forecasts_{postfix}.dst"), weights_only = False)
+    y: torch.Tensor = torch.load(join(path, f"observations_{postfix}.dst"), weights_only = False)
 
     return json.load(open(join(path, "station_metadata.json"), "r")), t, x, y
 
@@ -120,7 +120,9 @@ def load_forecast_data(path: str,
         case "precipitation":
             y = y[..., 1][..., None]
             y[y < 0.0] = 0.0
-
+            # Set station 37 observations to NaN since
+            # the training dataset has no recorded precipitation
+            # for that station
             y[37] = torch.nan
 
         case "wind":

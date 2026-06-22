@@ -131,12 +131,6 @@ class ModelMarginal(nn.Module):
         if self.censored:
 
             bellow: torch.Tensor = Q[idx] <= 0
-            
-            #print(bellow.sum()/Q[idx].numel())
-            #print(Q[0])
-
-            #
-
             dif[Q[idx] <= 0] = torch.nan
 
         i0: torch.Tensor = dif <  0.0
@@ -146,6 +140,5 @@ class ModelMarginal(nn.Module):
         dif[i1] *= q[idx][i1]
 
         return dif.nansum(dim = -1).nanmean()
-        #return dif.nanmean(dim = 0).nansum()
  
 

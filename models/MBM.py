@@ -7,6 +7,15 @@ from typing import Tuple, List
 import math
 
 class Model(nn.Module):
+    """
+    Ensemble post-processing model that predicts calibrated ensemble
+    samples for a target forecast variable.
+
+    The model combines forecast ensemble statistics, seasonal encodings,
+    station embeddings, and lead-time embeddings to learn an affine
+    transformation of the target forecast ensemble. Training is performed
+    using the Continuous Ranked Probability Score (CRPS).
+    """
 
     def __init__(self,
                  target_field_index: int,
@@ -21,6 +30,21 @@ class Model(nn.Module):
                  number_of_features: int,
                 
                  censored: bool = False):
+        """
+        Initialize the model.
+
+        Args:
+            target_field_index: Index of the forecast variable to be
+                calibrated.
+            number_of_forecast_fields: Number of forecast variables.
+            number_of_lead_times: Number of forecast lead times.
+            number_of_stations: Number of stations/locations.
+            nembeddings_per_lead_time: Size of the learned lead-time
+                embedding.
+            nembeddings_per_station: Size of the learned station embedding.
+            number_of_features: Hidden layer width of the neural network.
+            censored: Unused flag retained for interface compatibility.
+        """
 
         super().__init__()
 
@@ -41,6 +65,20 @@ class Model(nn.Module):
     def get_encodings(self,
                       day_of_year: torch.Tensor,
                       station_index: torch.Tensor) -> torch.Tensor:
+        """
+        Construct seasonal and station-specific encodings.
+
+        Seasonal information is represented using sine and cosine
+        transformations of the day-of-year value and concatenated with
+        a learned station embedding.
+
+        Args:
+            day_of_year: Normalized day-of-year values.
+            station_index: Station indices.
+
+        Returns:
+            Tensor containing seasonal and station encodings.
+        """
 
         day_of_year = day_of_year[:, 0]
 
@@ -50,6 +88,21 @@ class Model(nn.Module):
                           self.embeddings_station[station_index]], dim = -1)
 
     def forward(self, forecast: torch.Tensor, day_of_year: torch.Tensor, station_index: torch.Tensor) -> torch.Tensor:
+        """
+        Generate calibrated ensemble predictions.
+
+        Forecast ensemble means and standard deviations are combined with
+        station, lead-time, and seasonal encodings. The network predicts
+        parameters that shift and scale the target ensemble members.
+
+        Args:
+            forecast: Forecast ensemble tensor.
+            day_of_year: Normalized day-of-year values.
+            station_index: Station indices.
+
+        Returns:
+            Calibrated ensemble predictions for the target variable.
+        """
 
         xmu: torch.Tensor = forecast.mean(dim = 2)
         xsd: torch.Tensor = forecast.std(dim = 2)
@@ -71,6 +124,22 @@ class Model(nn.Module):
 
     @jit.ignore
     def loss(self, forecast: torch.Tensor, day_of_year: torch.Tensor, station_index: torch.Tensor, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the CRPS objective used for training.
+
+        The loss is calculated using the ensemble approximation of CRPS,
+        consisting of the mean absolute error term minus half of the
+        expected pairwise ensemble-member distance.
+
+        Args:
+            forecast: Forecast ensemble tensor.
+            day_of_year: Normalized day-of-year values.
+            station_index: Station indices.
+            observations: Observed target values.
+
+        Returns:
+            Scalar CRPS loss.
+        """
 
         res: torch.Tensor = self(forecast, day_of_year, station_index)
 
@@ -83,20 +152,3 @@ class Model(nn.Module):
         t1: torch.Tensor = (res[..., None] - res[:, None]).abs().mean(dim = (-1, -2))*0.5
 
         return (t0 - t1).mean()
-
-    @jit.ignore
-    def loss_es(self, forecast: torch.Tensor, day_of_year: torch.Tensor, station_index: torch.Tensor, observations: torch.Tensor) -> torch.Tensor:
-
-        res: torch.Tensor = self(forecast, day_of_year, station_index)
-
-        M: int = res.shape[-1]
-
-        #i: torch.Tensor = torch.tril_indices(M, M, offset = -1, device = res.device)
-
-        t0: torch.Tensor = torch.linalg.vector_norm(res - observations, dim = 1).mean(dim = -1)
-
-        #t1: torch.Tensor = 0.5*(res[..., None] - res[:, :, None]).pow(2).clip(min = 1e-16, max = None).sum(dim = 1).sqrt()#.mean(dim = (-1, -2))
-        t1: torch.Tensor = 0.5*torch.linalg.vector_norm((res[..., None] - res[:, :, None]), dim = 1).nanmean(dim = (-1, -2))
-
-        return (t0 - t1).mean()
-

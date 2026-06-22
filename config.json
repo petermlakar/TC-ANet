@@ -1,18 +1,18 @@
 {
-	"dataset_path": "/home/pmlakar/Documents/paper2026/ANET3-main/dataset",
-	"output_path": "/home/pmlakar/Documents/paper2026/ANET3-main/outputs",
+	"dataset_path": "",
+	"output_path": "",
 	"evaluation_path": "",
 
 	"train_experiment_name": "anet_temperature",
 	"predict_experiment_name": "",
 
-	"datasetType": "testf",
-	"predictionType": "joint",
+	"dataset_type": "testf",
+	"prediction_type": "joint",
 	
 	"variable": "temperature",
 
 	"evaluation_models": 
 	[
-		{"type": "ANet", "modelFolder": "", "label": "", "colorIndex": 1, "markerIndex": 1, "predictionType": "joint"}
+		{"type": "ANet", "model_folder": "", "label": "", "color_index": 1, "marker_index": 1, "prediction_type": "joint"}
 	]
 }

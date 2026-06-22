@@ -6,14 +6,35 @@ from math import sqrt, log
 
 from typing import Optional, Tuple, List
 
-from evaluation.metrics import crps_ensemble
-
 class SplineBlock(nn.Module):
 
+    """
+    Rational cubic spline transformation with support for forward
+    evaluation, inverse evaluation, and derivative computation.
+
+    The spline is defined by knot locations, knot values, and knot
+    derivatives and is extended linearly outside the boundary knots.
+    """
+
     def  __init__(self):
+        """
+        Initialize the spline block.
+        """
         super().__init__()
 
     def forward(self, x: torch.Tensor, _t: torch.Tensor, _y: torch.Tensor, _d: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the spline at the specified input locations.
+
+        Args:
+            x: Input values.
+            _t: Knot locations.
+            _y: Knot values.
+            _d: Knot derivatives.
+
+        Returns:
+            Spline-interpolated values.
+        """
 
         # x:    [batch*lead, 1, 1]
         # prm_: [batch*lead, 1, number_of_knots]
@@ -87,7 +108,19 @@ class SplineBlock(nn.Module):
 
     @jit.export
     def backward(self, y: torch.Tensor, _t: torch.Tensor, _y: torch.Tensor, _d: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the inverse spline transformation.
 
+        Args:
+            y: Output values.
+            _t: Knot locations.
+            _y: Knot values.
+            _d: Knot derivatives.
+
+        Returns:
+            Input values corresponding to the supplied outputs.
+        """
+        
         # y:    [batch*lead, quantiles, 1]
         # prm_: [batch*lead, 1, number_of_knots]
 
@@ -160,7 +193,18 @@ class SplineBlock(nn.Module):
 
     @jit.export
     def dt(self, x: torch.Tensor, _t: torch.Tensor, _y: torch.Tensor, _d: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the derivative of the spline with respect to x.
 
+        Args:
+            x: Input values.
+            _t: Knot locations.
+            _y: Knot values.
+            _d: Knot derivatives.
+
+        Returns:
+            First derivative of the spline.
+        """
         # x:    [batch*lead, 1, 1]
         # prm_: [batch*lead, 1, number_of_knots]
        
@@ -229,18 +273,45 @@ class SplineBlock(nn.Module):
         return torch.unsqueeze(p, dim = -1)
 
 class Normal(nn.Module):
+    """
+    Standard normal distribution helper class providing sampling,
+    quantile, log-density, and cumulative distribution functions.
+    """
 
     def __init__(self):
-
+        """
+        Initialize the standard normal distribution helper.
+        """
         super().__init__()
 
         self._a = nn.Parameter(torch.tensor(0.0, dtype = torch.float32), requires_grad = False)
         self.type: int = 0
 
     def sample(self, number_of_samples: int) -> torch.Tensor:
+        """
+        Draw samples from a standard normal distribution.
+
+        Args:
+            number_of_samples: Number of samples to generate.
+
+        Returns:
+            Tensor containing random samples.
+        """
         return torch.randn(number_of_samples, dtype = torch.float32, device = self._a.device)
 
     def quantile(self, number_of_quantiles: int, percentile: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Compute quantiles of the standard normal distribution.
+
+        Args:
+            number_of_quantiles: Number of evenly spaced quantiles to
+                generate when percentile is not provided.
+            percentile: Optional tensor of percentile values in the
+                interval [0, 1].
+
+        Returns:
+            Tensor containing the corresponding quantile values.
+        """
 
         if percentile is None:
             percentile = torch.arange(1.0/(number_of_quantiles + 1), 1.0, step = 1.0/(number_of_quantiles + 1), dtype = torch.float32, device = self._a.device)
@@ -248,14 +319,39 @@ class Normal(nn.Module):
         return sqrt(2.0)*torch.erfinv(2.0*percentile - 1.0)
 
     def lpdf(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the log probability density function.
+
+        Args:
+            x: Input values.
+
+        Returns:
+            Log-density evaluated at x.
+        """
         return -0.5*log(2.0*math.pi) - 0.5*x.pow(2)
 
     def cdf(self, x: torch.Tensor) -> torch.Tensor:
-        return 0.5 + 0.5*torch.erf(x/sqrt(2.0))
+        """
+        Evaluate the cumulative distribution function.
 
+        Args:
+            x: Input values.
+
+        Returns:
+            Cumulative probability evaluated at x.
+        """
+        return 0.5 + 0.5*torch.erf(x/sqrt(2.0))
+        
 class Logistic(nn.Module):
+    """
+    Standard logistic distribution helper class providing sampling,
+    quantile, log-density, and cumulative distribution functions.
+    """
 
     def __init__(self):
+        """
+        Initialize the standard logistic distribution helper.
+        """
 
         super().__init__()
 
@@ -263,12 +359,36 @@ class Logistic(nn.Module):
         self.type: int = 1
 
     def sample(self, number_of_samples: int) -> torch.Tensor:
+        """
+        Draw samples from a standard logistic distribution.
+
+        Samples are generated by applying the inverse logistic CDF
+        (logit transform) to uniformly distributed random values.
+
+        Args:
+            number_of_samples: Number of samples to generate.
+
+        Returns:
+            Tensor containing random samples.
+        """
         
         samples: torch.Tensor = torch.rand(number_of_samples, dtype = torch.float32, device = self._a.device).clamp(min = 1e-10, max = 1.0 - 1e-10)
 
         return (samples/(1.0 - samples)).log()
 
     def quantile(self, number_of_quantiles: int, percentile: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Compute quantiles of the standard logistic distribution.
+
+        Args:
+            number_of_quantiles: Number of evenly spaced quantiles to
+                generate when percentile is not provided.
+            percentile: Optional tensor of percentile values in the
+                interval [0, 1].
+
+        Returns:
+            Tensor containing the corresponding quantile values.
+        """
 
         if percentile is None:
             percentile = torch.arange(1.0/(number_of_quantiles + 1), 1.0, step = 1.0/(number_of_quantiles + 1), dtype = torch.float32, device = self._a.device)
@@ -276,14 +396,40 @@ class Logistic(nn.Module):
         return (percentile/(1.0 - percentile)).log() 
 
     def lpdf(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the log probability density function.
+
+        Args:
+            x: Input values.
+
+        Returns:
+            Log-density evaluated at x.
+        """
         return -x - 2.0*(1.0 + (-x).exp()).log()
 
     def cdf(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the cumulative distribution function.
+
+        Args:
+            x: Input values.
+
+        Returns:
+            Cumulative probability evaluated at x.
+        """
         return 1.0/(1.0 + (-x).exp())
 
 class Student(nn.Module):
+    """
+    Student's t distribution helper class providing sampling,
+    quantile evaluation, log-density evaluation, cumulative
+    distribution evaluation, and incomplete beta function utilities.
+    """
 
     def __init__(self):
+        """
+        Initialize the Student's t distribution helper.
+        """
 
         super().__init__()
 
@@ -291,6 +437,20 @@ class Student(nn.Module):
         self.type: int = 2
 
     def sample(self, number_of_samples: int, v: torch.Tensor) -> torch.Tensor:
+        """
+        Draw samples from a Student's t distribution.
+
+        Samples are generated using the representation of a
+        Student's t random variable as a standard normal variable
+        divided by the square root of a scaled chi-squared variable.
+
+        Args:
+            number_of_samples: Number of samples to generate.
+            v: Degrees-of-freedom parameters.
+
+        Returns:
+            Tensor containing random samples.
+        """
 
         Z: torch.Tensor = torch._standard_gamma(0.5*v)/0.5
         X: torch.Tensor = torch.randn((len(v), number_of_samples), dtype = torch.float32, device = v.device)
@@ -298,6 +458,21 @@ class Student(nn.Module):
         return X*(torch.rsqrt(Z/v)[:, None])
 
     def quantile(self, number_of_quantiles: int, v: torch.Tensor, percentile: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Compute quantiles of the Student's t distribution.
+
+        Quantiles are obtained through inversion of the regularized
+        incomplete beta function.
+
+        Args:
+            number_of_quantiles: Number of quantiles to generate.
+            v: Degrees-of-freedom parameters.
+            percentile: Optional percentile values in the interval
+                [0, 1].
+
+        Returns:
+            Tensor containing the corresponding quantile values.
+        """
         
         s0: int = v.shape[0]
 
@@ -320,9 +495,29 @@ class Student(nn.Module):
         return percentile.view(s0, number_of_quantiles)
 
     def lpdf(self, x: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the log probability density function.
+
+        Args:
+            x: Input values.
+            v: Degrees-of-freedom parameters.
+
+        Returns:
+            Log-density evaluated at x.
+        """
         return torch.lgamma((v + 1.0)/2.0) - torch.lgamma(v/2.0) - 0.5*(math.pi*v).log() - (1 + x.pow(2)/v).log()*(v + 1.0)/2.0
 
     def cdf(self, x: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the cumulative distribution function.
+
+        Args:
+            x: Input values.
+            v: Degrees-of-freedom parameters.
+
+        Returns:
+            Cumulative probability evaluated at x.
+        """
        
         batch, samples = x.shape[0], x.shape[1]
 
@@ -346,7 +541,23 @@ class Student(nn.Module):
         return F
 
     def iibf(self, p: torch.Tensor, a: torch.Tensor, b: torch.Tensor, N: int = 100, E: float = 1e-6) -> torch.Tensor:
+        """
+        Compute the inverse regularized incomplete beta function.
 
+        Uses iterative refinement to solve for x such that
+        I_x(a, b) = p.
+
+        Args:
+            p: Target cumulative probabilities.
+            a: First shape parameter.
+            b: Second shape parameter.
+            N: Maximum number of iterations.
+            E: Convergence tolerance.
+
+        Returns:
+            Inverse incomplete beta values.
+        """
+        
         x: torch.Tensor = torch.zeros_like(p)
         x[p >= 1.0] = 1.0
 
@@ -424,7 +635,17 @@ class Student(nn.Module):
         return x
 
     def ibf(self, x: torch.Tensor, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the regularized incomplete beta function.
 
+        Args:
+            x: Evaluation points.
+            a: First shape parameter.
+            b: Second shape parameter.
+
+        Returns:
+            Values of the regularized incomplete beta function.
+        """
         # TODO a > 3000 and b > 3000 case not handled differently with an optimization
 
         p: torch.Tensor = torch.zeros_like(x)
@@ -449,7 +670,23 @@ class Student(nn.Module):
         return p
 
     def betacf(self, x: torch.Tensor, a: torch.Tensor, b: torch.Tensor, M: int = 1000, E: float = 1e-6) -> torch.Tensor:
+        """
+        Evaluate the continued-fraction representation used in the
+        computation of the incomplete beta function.
 
+        The implementation follows a modified Lentz algorithm for
+        stable evaluation of the continued fraction.
+
+        Args:
+            x: Evaluation points.
+            a: First shape parameter.
+            b: Second shape parameter.
+            M: Maximum number of continued-fraction iterations.
+            E: Convergence tolerance.
+
+        Returns:
+            Continued-fraction approximation values.
+        """
         #fpmin: torch.Tensor = torch.finfo(torch.float32).tiny/E
         fpmin: torch.Tensor = torch.tensor(1.1754943508222875e-38/E, dtype = torch.float32, device = x.device)
 
@@ -492,11 +729,29 @@ class Student(nn.Module):
         return h
 
 class ModelMarginal(nn.Module):
+    """
+    Marginal distribution model based on a sequence of rational cubic
+    spline flow transformations applied to a chosen base distribution.
+
+    The model maps samples from a base distribution (Normal, Logistic,
+    or Student's t) through one or more spline blocks to obtain a
+    flexible marginal distribution whose parameters are predicted by
+    an external neural network.
+    """
 
     def __init__(self, 
                  number_of_blocks: int = 1, 
                  number_of_knots: int = 6,
                  base_type: int = 0):
+        """
+        Initialize the marginal flow model.
+
+        Args:
+            number_of_blocks: Number of spline flow transformations.
+            number_of_knots: Number of knots used by each spline block.
+            base_type: Base distribution type
+                (0 = Normal, 1 = Logistic, 2 = Student's t).
+        """
 
         super().__init__()
 
@@ -528,6 +783,19 @@ class ModelMarginal(nn.Module):
            raise RuntimeError('Unsupported base distribution class.')
 
     def forward(self, f: torch.Tensor, model_parameters: List[torch.Tensor]) -> torch.Tensor:
+        """
+        Apply the sequence of spline flow transformations.
+
+        Args:
+            f: Samples from the base distribution or intermediate
+                transformed values.
+            model_parameters: Spline parameters generated by
+                set_parameters().
+
+        Returns:
+            Transformed samples after all spline blocks have been
+            applied.
+        """
         
         for i in torch.arange(self.number_of_blocks):
             _t, _y, _d = self.initialize_spline(model_parameters, i)
@@ -537,6 +805,21 @@ class ModelMarginal(nn.Module):
 
     @jit.export
     def set_parameters(self, parameters: torch.Tensor) -> List[torch.Tensor]:
+        """
+        Convert a flattened parameter tensor into structured spline
+        parameters.
+
+        Depending on the selected base distribution, this method
+        extracts spline knot parameters and optional distribution
+        parameters.
+
+        Args:
+            parameters: Raw model output tensor.
+
+        Returns:
+            List containing spline knot parameters and any additional
+            base-distribution parameters.
+        """
 
         if self.type <= 1:
             parameters = parameters.view((parameters.shape[0], parameters.shape[1], self.number_of_blocks, 2, self.number_of_knots))
@@ -552,6 +835,20 @@ class ModelMarginal(nn.Module):
             raise RuntimeError('Unsupported base distribution class.')
 
     def initialize_spline(self, model_parameters: List[torch.Tensor], i: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Construct spline knot locations, knot values, and knot
+        derivatives for a specific spline block.
+
+        Args:
+            model_parameters: Structured spline parameters.
+            i: Index of the spline block.
+
+        Returns:
+            Tuple containing:
+                - knot locations (t),
+                - knot values (y),
+                - knot derivatives (d).
+        """
 
         prm_t, prm_y = model_parameters
             
@@ -571,6 +868,24 @@ class ModelMarginal(nn.Module):
              number_of_quantiles: int,
              model_parameters: List[torch.Tensor],
              percentile: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Evaluate the inverse cumulative distribution function (quantile
+        function) of the learned marginal distribution.
+
+        Quantiles are first generated from the selected base
+        distribution and then transformed through the inverse spline
+        flow.
+
+        Args:
+            number_of_quantiles: Number of quantiles to generate.
+            model_parameters: Structured spline and distribution
+                parameters.
+            percentile: Optional percentile values in the interval
+                [0, 1].
+
+        Returns:
+            Quantiles of the learned marginal distribution.
+        """
 
         if self.type <= 1:
 
@@ -611,7 +926,54 @@ class ModelMarginal(nn.Module):
         return y.clamp(min = 1e-8, max = None)
 
     @jit.export
+    def cdf(self, y: torch.Tensor, model_parameters: List[torch.Tensor]) -> torch.Tensor:
+        """
+        Evaluate the cumulative distribution function of the learned
+        marginal distribution.
+
+        The input values are first transformed into the latent base
+        distribution space using the spline flow and then evaluated
+        using the selected base distribution CDF.
+
+        Args:
+            y: Values at which to evaluate the CDF.
+            model_parameters: Structured spline and distribution
+                parameters.
+
+        Returns:
+            Cumulative probabilities corresponding to y.
+        """
+       
+        if self.type <= 1:
+
+            if self.type == 0:
+                y = self.base_n.cdf(self(y, model_parameters))
+            else:
+                y = self.base_l.cdf(self(y, model_parameters))
+
+        elif self.type == 2:
+            y = self.base_s.cdf(self(y, [model_parameters[0], model_parameters[1]]), model_parameters[2])
+        else:
+            raise RuntimeError('Unsupported base distribution class.')
+        
+        return y.clamp(min = 1e-8, max = None)
+
+    @jit.export
     def ecdf(self, y: torch.Tensor, parameters: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the marginal CDF using the raw parameter tensor.
+
+        This convenience wrapper converts the raw model output into
+        structured parameters before calling cdf().
+
+        Args:
+            y: Values at which to evaluate the CDF.
+            parameters: Raw parameter tensor predicted by the model.
+
+        Returns:
+            Cumulative probabilities with the same leading dimensions
+            as the input.
+        """
 
         s0, s1 = y.shape[0], y.shape[1]
 
@@ -621,6 +983,21 @@ class ModelMarginal(nn.Module):
 
     @jit.export
     def lpdf(self, x: torch.Tensor, parameters: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluate the log probability density function of the learned
+        marginal distribution.
+
+        The log-density is computed using the change-of-variables
+        formula by combining the base-distribution log-density with
+        the accumulated spline Jacobian terms.
+
+        Args:
+            x: Values at which to evaluate the log-density.
+            parameters: Raw parameter tensor predicted by the model.
+
+        Returns:
+            Log-density values with the same shape as x.
+        """
 
         model_parameters: List[torch.Tensor] = self.set_parameters(parameters)        
 
@@ -660,6 +1037,20 @@ class ModelMarginal(nn.Module):
     def backward(self, 
                  p: torch.Tensor,
                  model_parameters: List[torch.Tensor]) -> torch.Tensor:
+        """
+        Apply the inverse spline flow transformation.
+
+        The spline blocks are traversed in reverse order to map values
+        from the latent base-distribution space back into the observed
+        data space.
+
+        Args:
+            p: Values in latent distribution space.
+            model_parameters: Structured spline parameters.
+
+        Returns:
+            Values transformed into observation space.
+        """
 
         # p: [batch*lead, quantiles, 1]
         # prm_: [batch*lead, nsplines, number_of_knots]
@@ -672,6 +1063,19 @@ class ModelMarginal(nn.Module):
 
     @jit.export
     def sample_marginal(self, number_of_samples: int, parameters: torch.Tensor) -> torch.Tensor:
+        """
+        Generate random samples from the learned marginal distribution.
+
+        Samples are first drawn from the selected base distribution and
+        then transformed through the inverse spline flow.
+
+        Args:
+            number_of_samples: Number of samples to generate.
+            parameters: Raw parameter tensor predicted by the model.
+
+        Returns:
+            Samples with shape [batch, lead, number_of_samples].
+        """
         
         batch, lead = parameters.shape[0], parameters.shape[1]
         model_parameters: List[torch.Tensor] = self.set_parameters(parameters)
@@ -696,59 +1100,48 @@ class ModelMarginal(nn.Module):
 
     @jit.export
     def sample_marginal_quantile(self, number_of_quantiles: int, parameters: torch.Tensor, percentile: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Generate quantiles from the learned marginal distribution.
+
+        Args:
+            number_of_quantiles: Number of quantiles to generate.
+            parameters: Raw parameter tensor predicted by the model.
+            percentile: Optional percentile values in the interval
+                [0, 1].
+
+        Returns:
+            Quantiles with shape
+            [batch, lead, number_of_quantiles].
+        """
     
         batch, lead = parameters.shape[0], parameters.shape[1]
         model_parameters: List[torch.Tensor] = self.set_parameters(parameters)
 
         quantiles: torch.Tensor = self.icdf(number_of_quantiles, model_parameters, percentile).view(batch, lead, number_of_quantiles)
 
-        return quantiles#quantiles.clip(min = 0.0, max = None) if self.censored else quantiles
-
-    @jit.ignore
-    def loss_energy(self,
-                    y: torch.Tensor,
-                    parameters: torch.Tensor,
-                    number_of_samples: int = 500) -> torch.Tensor:
-
-        model_parameters: List[torch.Tensor] = self.set_parameters(parameters)
-
-        batch, lead = y.shape[:2]
-
-        loss: torch.Tensor = torch.zeros_like(y)*torch.nan
-        y = y[..., None]
-
-        samples: torch.Tensor = torch.randn((batch*lead, number_of_samples), dtype = torch.float32, device = y.device)
-        samples = self.backward(samples[..., None], model_parameters).view(batch, lead, number_of_samples)
-
-        return (((y - samples).pow(2).sum(dim = 1) + 1e-8).sqrt().mean(dim = -1) - 0.5*((samples[..., None] - samples[:, :, None]).pow(2).sum(dim = 1) + 1e-8).sqrt().mean(dim = (-1, -2))).mean()
-
-    @jit.ignore
-    def loss_crps(self,
-                  y: torch.Tensor,
-                  parameters: torch.Tensor,
-                  number_of_samples: int = 500) -> Optional[torch.Tensor]:
-
-
-        batch, lead = y.shape[:2]
-        y = y[..., None]
-
-        samples: torch.Tensor = self.sample_marginal(number_of_samples, parameters)
-        
-        crps: torch.Tensor = (samples - y).abs().mean(dim = -1) - 0.5*(samples[..., None] - samples[..., None, :]).abs().mean(dim = (-2, -1))
-
-        return crps
-
-        #crps: torch.Tensor = (samples - y).abs().sum(dim = (-1, -2))/number_of_samples - (samples - samples.swapaxes(-1, -2)).abs().sum(dim = (-1, -2))/(number_of_samples*number_of_samples*2)
-        
-        #number_of_quantiles: int = 101
-        #quantiles: torch.Tensor = torch.arange(1.0/(number_of_quantiles + 1), 1.0, step = 1.0/(number_of_quantiles + 1), dtype = torch.float32, device = y.device)[None, None].expand(-1, lead, -1)
-        #q: torch.Tensor = self.iF(quantiles.expand(batch, -1, -1), model_parameters, distribution_parameters)
-        #crps: torch.Tensor = crps_ensemble(q, y).squeeze()
+        return quantiles
 
     @jit.ignore
     def loss(self, 
              f: torch.Tensor,
              parameters: torch.Tensor):
+        """
+        Compute the negative log-likelihood training loss.
+
+        Observations are transformed into the latent base-distribution
+        space and evaluated using the change-of-variables formula.
+        When censoring is enabled, additional likelihood terms are
+        included for censored observations.
+
+        Args:
+            f: Observed values with shape [batch, lead].
+            parameters: Raw parameter tensor predicted by the model.
+
+        Returns:
+            Per-sample negative log-likelihood values with shape
+            [batch, lead], or None if no valid observations are
+            available.
+        """
 
         model_parameters: List[torch.Tensor] = self.set_parameters(parameters)
 
@@ -812,11 +1205,6 @@ class ModelMarginal(nn.Module):
                 _model_parameters: List[torch.Tensor] = [m[i0] for m in model_parameters]
                 _cdf: torch.Tensor = self.cdf(torch.zeros((i0.sum(), 1, 1), dtype = torch.float32, device = f.device), _model_parameters)
                 loss_out[i0] = -(_cdf + 1e-10).log().squeeze()
-
-            #if idx_cns.any():
-            #    _model_parameters: List[torch.Tensor] = [m[idx_cns] for m in model_parameters]
-            #    _cdf: torch.Tensor = self.cdf(torch.zeros((idx_cns.sum(), 1, 1), dtype = torch.float32, device = f.device), _model_parameters)
-            #    loss_out[idx_cns] += -(1 - _cdf + 1e-10).log().squeeze()
 
             return loss_out.view(dim_batch, dim_lead)
 

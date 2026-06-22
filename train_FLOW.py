@@ -15,8 +15,6 @@ from tqdm import tqdm
 import sys
 import random
 
-from torch.profiler import profile, record_function, ProfilerActivity
-
 from models.FLOW_ENCODER import ForecastEncoder
 from models.FLOW_MARGINAL import ModelMarginal 
 from models.FLOW_JOINT import ModelJoint
@@ -38,7 +36,7 @@ if not exists(output_path) and write_to_file:
 
 learning_rate: float = 1e-3
 weight_decay: float = 1e-8
-batch_size: int = 256 
+batch_size: int = 256
 number_of_epochs: int = 1000
 tolerance: int = 10
 

@@ -27,7 +27,7 @@ dataset_path: str = config["dataset_path"]
 output_path: str = config["output_path"]
 input_path: str = output_path
 experiment_name: str = config["predict_experiment_name"]
-dataset_type: str = config['datasetType']
+dataset_type: str = config['dataset_type']
 
 input_path: str = join(input_path, experiment_name)
 output_path: str = join(output_path, experiment_name)
@@ -91,7 +91,7 @@ model_weights = model_weights.to(device)
 
 # # # # #
 
-prediction_type: str = config['predictionType']
+prediction_type: str = config['prediction_type']
 
 number_of_steps: int = 100
 number_of_samples: int = number_of_members//len(models_regression)

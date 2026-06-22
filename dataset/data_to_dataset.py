@@ -22,73 +22,73 @@ _observations_test = None
 _time_training = None
 _time_test = None
 
-for country in ["austria", "belgium", "france", "germany", "netherlands"]:
+for country in ['austria', 'belgium', 'france', 'germany', 'netherlands']:
 
-    print("Processing: ", country)
+    print('Processing: ', country)
 
-    forecast_surface   = nc.Dataset(join(".", country, "forecast_surface.nc"))
-    reforecast_surface = nc.Dataset(join(".", country, "reforecast_surface.nc"))
+    forecast_surface   = nc.Dataset(join('.', country, 'forecast_surface.nc'))
+    reforecast_surface = nc.Dataset(join('.', country, 'reforecast_surface.nc'))
 
     # Reforecasts hours since 1997-01-02
 
-    observations_forecast_surface   = nc.Dataset(join(".", country, "observations_forecast_surface.nc"))
-    observations_reforecast_surface = nc.Dataset(join(".", country, "observations_reforecast_surface.nc"))
+    observations_forecast_surface   = nc.Dataset(join('.', country, 'observations_forecast_surface.nc'))
+    observations_reforecast_surface = nc.Dataset(join('.', country, 'observations_reforecast_surface.nc'))
 
-    observations_forecast_processed = nc.Dataset(join(".", country, "observations_forecast_processed.nc"))
-    observations_reforecast_processed = nc.Dataset(join(".", country, "observations_reforecast_processed.nc"))
+    observations_forecast_processed = nc.Dataset(join('.', country, 'observations_forecast_processed.nc'))
+    observations_reforecast_processed = nc.Dataset(join('.', country, 'observations_reforecast_processed.nc'))
 
-    station_variables = ["station_id", "station_name", "longitude", "latitude", "altitude"]
+    station_variables = ['station_id', 'station_name', 'longitude', 'latitude', 'altitude']
     for id, name, lon, lat, alt in zip(*[observations_forecast_surface[k][:] for k in station_variables]):
-        station_metadata[id.item()] = {"name": name, "lon": lon.item(), "lat": lat.item(), "alt": alt.item(), "index": station_index, "country": country}
+        station_metadata[id.item()] = {'name': name, 'lon': lon.item(), 'lat': lat.item(), 'alt': alt.item(), 'index': station_index, 'country': country}
         station_index += 1
 
-    forecast_processed   = nc.Dataset(join(".", country, "forecast_processed.nc"))
-    reforecast_processed = nc.Dataset(join(".", country, "reforecast_processed.nc"))
+    forecast_processed   = nc.Dataset(join('.', country, 'forecast_processed.nc'))
+    reforecast_processed = nc.Dataset(join('.', country, 'reforecast_processed.nc'))
 
-    forecast_850 = nc.Dataset(join(".", country, "forecast_pressure_850.nc"))
-    reforecast_850 = nc.Dataset(join(".", country, "reforecast_pressure_850.nc"))
+    forecast_850 = nc.Dataset(join('.', country, 'forecast_pressure_850.nc'))
+    reforecast_850 = nc.Dataset(join('.', country, 'reforecast_pressure_850.nc'))
 
-    forecast_700 = nc.Dataset(join(".", country, "forecast_pressure_700.nc"))
-    reforecast_700 = nc.Dataset(join(".", country, "reforecast_pressure_700.nc"))
+    forecast_700 = nc.Dataset(join('.', country, 'forecast_pressure_700.nc'))
+    reforecast_700 = nc.Dataset(join('.', country, 'reforecast_pressure_700.nc'))
 
-    forecast_500 = nc.Dataset(join(".", country, "forecast_pressure_500.nc"))
-    reforecast_500 = nc.Dataset(join(".", country, "reforecast_pressure_500.nc"))
+    forecast_500 = nc.Dataset(join('.', country, 'forecast_pressure_500.nc'))
+    reforecast_500 = nc.Dataset(join('.', country, 'reforecast_pressure_500.nc'))
 
     # Temperature variables
-    dataset_prefix: str = "temperature"
-    sfc_var  = ["t2m", "u10", "v10", "tcc", "u100", "v100", "tcw", "tcwv", "sd", "cape", "stl1", "swvl1", "vis"]
-    sfcp_var = ["ssrd6", "ssr6", "sshf6", "slhf6", "str6", "strd6", "mn2t6", "mx2t6", "p10fg6", "tp6", "cp6"]
-    p850_var = ["t"]
-    p700_var = ["q", "u", "v"]
-    p500_var = ["z"]
+    dataset_prefix: str = 'temperature'
+    sfc_var  = ['t2m', 'u10', 'v10', 'tcc', 'u100', 'v100', 'tcw', 'tcwv', 'sd', 'cape', 'stl1', 'swvl1', 'vis']
+    sfcp_var = ['ssrd6', 'ssr6', 'sshf6', 'slhf6', 'str6', 'strd6', 'mn2t6', 'mx2t6', 'p10fg6', 'tp6', 'cp6']
+    p850_var = ['t']
+    p700_var = ['q', 'u', 'v']
+    p500_var = ['z']
 
-    #sfc_var  = ["t2m", "stl1", "u10", "v10", "u100", "v100"]
-    #sfcp_var = ["strd6", "mn2t6", "mx2t6", "p10fg6"]
-    #p850_var = ["t"]
-    #p700_var = ["u", "v"]
+    #sfc_var  = ['t2m', 'stl1', 'u10', 'v10', 'u100', 'v100']
+    #sfcp_var = ['strd6', 'mn2t6', 'mx2t6', 'p10fg6']
+    #p850_var = ['t']
+    #p700_var = ['u', 'v']
     #p500_var = []
 
     # t2m, mx2t6, mn2t6, stl1, p10fg6, strd6
 
     # Precipitation variables
-    #dataset_prefix: str = "precipitation"
-    #sfc_var = ["tcw", "tcwv", "u10", "v10"]
-    #sfcp_var = ["tp6", "cp6"]
+    #dataset_prefix: str = 'precipitation'
+    #sfc_var = ['tcw', 'tcwv', 'u10', 'v10']
+    #sfcp_var = ['tp6', 'cp6']
     #p850_var = []
     #p700_var = []
-    #p500_var = ["z"]
+    #p500_var = ['z']
 
-    obs_sfc_var = ["t2m"]
-    obs_prc_var = ["tp6"]
+    obs_sfc_var = ['t2m']
+    obs_prc_var = ['tp6', 'p10fg6']
 
-    d = datetime.strptime("1997-01-02", "%Y-%m-%d").replace(tzinfo = UTC).timestamp()
-    dp = datetime.strptime("1997-01-02T06:00:00", "%Y-%m-%dT%H:%M:%S").replace(tzinfo = UTC).timestamp()
-    dpt = datetime.strptime("2017-01-01T06:00:00", "%Y-%m-%dT%H:%M:%S").replace(tzinfo = UTC).timestamp()
+    d = datetime.strptime('1997-01-02', '%Y-%m-%d').replace(tzinfo = UTC).timestamp()
+    dp = datetime.strptime('1997-01-02T06:00:00', '%Y-%m-%dT%H:%M:%S').replace(tzinfo = UTC).timestamp()
+    dpt = datetime.strptime('2017-01-01T06:00:00', '%Y-%m-%dT%H:%M:%S').replace(tzinfo = UTC).timestamp()
 
     # Skip first lead time which corresponds to the analysis run
 
-    t_training = [reforecast_surface["valid_time"][:][..., 1:]*60**2 + d, reforecast_processed["valid_time"][:]*60**2 + dp, reforecast_850["valid_time"][:][..., 1:]*60**2 + d, reforecast_700["valid_time"][:][..., 1:]*60**2 + d]
-    t_test     = [forecast_surface["valid_time"][:][..., 1:], forecast_processed["valid_time"][:]*60**2 + dpt, forecast_850["valid_time"][:][..., 1:], forecast_700["valid_time"][:][..., 1:]]
+    t_training = [reforecast_surface['valid_time'][:][..., 1:]*60**2 + d, reforecast_processed['valid_time'][:]*60**2 + dp, reforecast_850['valid_time'][:][..., 1:]*60**2 + d, reforecast_700['valid_time'][:][..., 1:]*60**2 + d]
+    t_test     = [forecast_surface['valid_time'][:][..., 1:], forecast_processed['valid_time'][:]*60**2 + dpt, forecast_850['valid_time'][:][..., 1:], forecast_700['valid_time'][:][..., 1:]]
 
     for i in range(1, len(t_training)):
         assert (t_training[i - 1] == t_training[i]).all()
@@ -163,18 +163,20 @@ for country in ["austria", "belgium", "france", "germany", "netherlands"]:
     else:
         assert (_time_test == t_test).all()
 
+    break
+
 print(_forecasts_training.shape, _observations_training.shape)
 print(_forecasts_test.shape, _observations_test.shape)
 
-torch.save(_forecasts_training, f"forecasts_training_{dataset_prefix}.dst")
-torch.save(_forecasts_test, f"forecasts_test_{dataset_prefix}.dst")
+torch.save(_forecasts_training, 'forecasts_training.dst')
+torch.save(_forecasts_test, 'forecasts_test.dst')
 
-torch.save(_observations_training, f"observations_training_{dataset_prefix}.dst")
-torch.save(_observations_test, f"observations_test_{dataset_prefix}.dst")
+torch.save(_observations_training, 'observations_training.dst')
+torch.save(_observations_test, 'observations_test.dst')
 
-torch.save(_time_training, f"time_training_{dataset_prefix}.dst")
-torch.save(_time_test, f"time_test_{dataset_prefix}.dst")
+torch.save(_time_training, 'time_training.dst')
+torch.save(_time_test, 'time_test.dst')
 
-with open("station_metadata.json", "w") as f:
+with open('station_metadata.json', 'w') as f:
     json.dump(station_metadata, f)
 

@@ -22,7 +22,7 @@ dataset_path: str = config["dataset_path"]
 output_path: str = config["output_path"]
 input_path: str = output_path
 experiment_name: str = config["predict_experiment_name"]
-dataset_type: str = config['datasetType']
+dataset_type: str = config['dataset_type']
 
 input_path: str = join(input_path, experiment_name)
 output_path: str = join(output_path, experiment_name)
@@ -68,7 +68,7 @@ models_regression: List[torch.nn.Module] = [jit.load(join(input_path, k, "model"
 
 print(len(models_regression))
 
-prediction_type: str = config['predictionType']
+prediction_type: str = config['prediction_type']
 
 match prediction_type:
     case 'joint' | 'marginal':
