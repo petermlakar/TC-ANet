@@ -5,7 +5,7 @@
 ## Requirements
 
 ~~~
-pip3 install matplotlib scikit-learn numpy xarray zarr tqdm Cartopy
+pip3 install matplotlib scikit-learn numpy xarray zarr netCDF4 tqdm Cartopy
 pip3 install torch=2.11 --index-url https://download.pytorch.org/whl/cu126
 ~~~
 
