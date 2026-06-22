@@ -163,8 +163,6 @@ for country in ['austria', 'belgium', 'france', 'germany', 'netherlands']:
     else:
         assert (_time_test == t_test).all()
 
-    break
-
 print(_forecasts_training.shape, _observations_training.shape)
 print(_forecasts_test.shape, _observations_test.shape)
 
