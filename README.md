@@ -4,8 +4,10 @@
 
 ## Requirements
 
+~~~
 pip3 install matplotlib scikit-learn numpy xarray zarr netCDF4 tqdm
 pip3 install torch=2.11 --index-url https://download.pytorch.org/whl/cu126
+~~~
 
 ## Data Preparation
 
