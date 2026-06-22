@@ -5,8 +5,6 @@ import sklearn
 
 from time import time
 
-import matplotlib.pyplot as plt
-
 from typing import List, Dict, Tuple, Optional
 
 def diebold_mariano(s1: torch.Tensor, s2: torch.Tensor, label1: str, label2: str, alpha: float = 0.05) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -110,36 +108,11 @@ def twcrps(x: torch.Tensor, y: torch.Tensor, n: int = 30, title: Optional[str] =
 
         crps: torch.Tensor = torch.cat([crps_ensemble(_x, _y) for (_x, _y) in zip(torch.chunk(xt, max(xt.shape[0]//100, 1), 0), torch.chunk(yt, max(yt.shape[0]//100, 1), 0))], dim = 0)
 
-        """
-        f, a = plt.subplots(1, dpi = 300)
-
-        a.plot(xt[crps > 0], label = 'Prd', alpha = 0.4, color = 'lightskyblue')
-        a.plot(yt[crps > 0], label = 'Obs')
-
-        f.savefig(f'twcrps_{title}.png')anet_wind_nodp
-
-        if title is not None:
-            a.set_title(title)
-        plt.close(f)
-        """
-
         C.append((y >= t).sum()/N)
         X.append(t)
         Y.append(crps.nanmean())
 
         print((y >= t).sum(), t, crps.nanmean(), crps.std())
-
-        if t > 40:
-            
-            idx = y >= t
-
-            f, a = plt.subplots(1, dpi = 300, figsize = (15, 10))
-
-            a.plot(x[y >= t], color = 'lightskyblue', alpha = 0.5)
-            a.plot(y[y >= t])
-
-            plt.savefig('tmp.png')
-            plt.close(f)
 
     return torch.tensor(C), torch.tensor(X), torch.tensor(Y)
 

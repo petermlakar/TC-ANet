@@ -15,11 +15,6 @@ import sys
 
 from time import time
 
-import matplotlib.pyplot as plt
-
-from torch.profiler import profile, record_function, ProfilerActivity
-
-from models.CSG import ModelMarginal
 
 config: Dict[str, str] = json.load(open(join(sys.argv[1], "config.json"), "r"))
 
@@ -42,40 +37,29 @@ prefix: str = config['variable']
 match prefix:
     case 'temperature':
         censored: bool = False
-        target_field_index: int = None
-        residuals: bool = False
-    case 'precipitation':
+    case 'precipitation' | 'wind':
         censored: bool = True
-        target_field_index: int = None
-        residuals: bool = False
-    case 'wind':
-        censored: bool = True
-        target_field_index: int = None
-        residuals: bool = False 
     case _:
         censored: bool = False
-        target_field_index: int = None
-        residuals: bool = False
 
-
-m, dataset_train = load_reforecast_train(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
+m, dataset_train = load_reforecast_train(dataset_path, data_loader, batch_size, device, prefix)
 
 match dataset_type:
     
     case "train":
-        xmu, xds, mu, sd = reforecast_standardize(dataset_train, dataset_train, prefix, residuals = residuals)
+        xmu, xds, mu, sd = reforecast_standardize(dataset_train, dataset_train, prefix)
         dataset = dataset_train
     case "valid":
-        _, dataset_valid = load_reforecast_valid(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
-        xmu, xds, mu, sd = reforecast_standardize(dataset_valid, dataset_train, prefix, residuals = residuals)
+        _, dataset_valid = load_reforecast_valid(dataset_path, data_loader, batch_size, device, prefix)
+        xmu, xds, mu, sd = reforecast_standardize(dataset_valid, dataset_train, prefix)
         dataset = dataset_valid
     case "test":
-        _, dataset_test = load_reforecast_test(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
-        xmu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix, residuals = residuals)
+        _, dataset_test = load_reforecast_test(dataset_path, data_loader, batch_size, device, prefix)
+        xmu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix)
         dataset = dataset_test
     case "testf":
         _, dataset_test = load_forecast_data(dataset_path, batch_size, device, prefix)
-        ymu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix, residuals = residuals)
+        ymu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix)
         dataset = dataset_test
     case _:
         raise RuntimeError(f'Invalid dataset type {dataset_type}')
@@ -132,14 +116,12 @@ with torch.no_grad():
                         samples.append(model.model_marginal.sample_marginal_quantile(number_of_quantiles, model(x, d, s))[..., None])
 
                     case 'joint':
-                        #samples.append(model.model_marginal.sample_marginal(number_of_members//len(models_regression) + (sampler == n).sum().item(), model(x, d, s)))
                         samples.append(model.model_marginal.sample_marginal_quantile(number_of_quantiles, model(x, d, s)))
 
         match prediction_type:
             case 'marginal':
                 samples: torch.Tensor = torch.stack(samples, dim = -1).mean(dim = -1)
             case 'joint':
-                #samples: torch.Tensor = torch.cat(samples, dim = -1).sort(dim = -1)[0]
                 samples: torch.Tensor = torch.stack(samples, dim = -1).mean(dim = -1)
 
                 match prefix:

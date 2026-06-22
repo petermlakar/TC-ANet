@@ -46,7 +46,7 @@ match prefix:
     case _:
         censored: bool = False
 
-m, dataset_train = load_reforecast_train(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
+m, dataset_train = load_reforecast_train(dataset_path, data_loader, batch_size, device, prefix)
 
 match dataset_type:
     
@@ -54,11 +54,11 @@ match dataset_type:
         xmu, xsd, mu, sd = reforecast_standardize(dataset_train, dataset_train, prefix)
         dataset = dataset_train
     case "valid":
-        _, dataset_valid = load_reforecast_valid(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
+        _, dataset_valid = load_reforecast_valid(dataset_path, data_loader, batch_size, device, prefix)
         xmu, xsd, mu, sd = reforecast_standardize(dataset_valid, dataset_train, prefix)
         dataset = dataset_valid
     case "test":
-        _, dataset_test = load_reforecast_test(dataset_path, data_loader, batch_size, device, prefix, target_field_index)
+        _, dataset_test = load_reforecast_test(dataset_path, data_loader, batch_size, device, prefix)
         xmu, xsd, mu, sd = reforecast_standardize(dataset_test, dataset_train, prefix)
         dataset = dataset_test
     case "testf":

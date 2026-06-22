@@ -1,8 +1,6 @@
 import torch
 
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 from typing import List, Tuple, Dict, Optional
 
 from os.path import join, exists
@@ -72,71 +70,6 @@ def plot_stratify(models: Dict, config: Dict, station_metadata: Dict):
     f.tight_layout()
     f.savefig(join(config['outputPath'], 'stratified.png'), bbox_inches = 'tight')
     plt.close(f)
-
-
-def plot_map(models: Dict, config: Dict, station_metadata: Dict):
-
-    extent: List[int] = [2.0, 11.14, 45, 54.5]
-
-    fig = plt.figure(figsize = (10, 10), dpi = 300)
-
-    ax = plt.axes(projection = ccrs.PlateCarree())
-    ax.set_extent(extent, crs = ccrs.PlateCarree())
-
-    # Background features
-    ax.add_feature(cfeature.LAND, facecolor = "lightgray")
-    ax.add_feature(cfeature.OCEAN, facecolor = "lightblue")
-    ax.add_feature(cfeature.COASTLINE, linewidth = 0.8)
-    ax.add_feature(cfeature.BORDERS, linestyle = ":", linewidth = 0.8)
-
-    # Optional administrative borders
-    #ax.add_feature(cfeature.STATES, linewidth = 0.3)
-
-    # Gridlines
-    gl = ax.gridlines(
-        draw_labels = True,
-        linewidth = 0.5,
-        color = "gray",
-        alpha = 0.5,
-        linestyle = "--")
-
-    gl.top_labels = False
-    gl.right_labels = False
-
-    gl.xlabel_style = {"size": 18}
-    gl.ylabel_style = {"size": 18}
-
-    lon: torch.Tensor = torch.tensor([station_metadata[i]['lon'] for i in station_metadata])
-    lat: torch.Tensor = torch.tensor([station_metadata[i]['lat'] for i in station_metadata])
-    idx: torch.Tensor = torch.tensor([station_metadata[i]['index'] for i in station_metadata])
-
-    scores_max: torch.Tensor = torch.stack([torch.stack(model['crps_per_station'], dim = 0).nanmean(dim = 0) for model in models], dim = 1).argmin(dim = 1)
-   
-    for i in scores_max.unique():
-
-        _i: torch.Tensor = scores_max == i
-
-        sc = ax.scatter(
-            lon[_i],
-            lat[_i],
-            marker = models[i]['marker'],
-            c = models[i]['color'],
-            label = f"{models[i]['label']} [{(100*_i.sum()/len(_i)):.2f} %]",
-            s = 60,
-            edgecolors = "black",
-            linewidths = 0.5,
-            transform = ccrs.PlateCarree(),
-            zorder = 10)
-
-    ax.legend(loc = 'best', scatterpoints = 1, fontsize = 16)
-
-    ax.set_xlabel('Longitude', fontsize = 20)
-    ax.set_ylabel('Latitude', fontsize = 20)
-    ax.set_title(config['varName'], fontsize = 20)
-
-    fig.tight_layout()
-    fig.savefig(join(config['outputPath'], 'map.png'), bbox_inches = 'tight')
-    plt.close(fig)
 
 def plot_reliability(models: Dict, config: Dict):
 

@@ -13,7 +13,7 @@ import sys
 import matplotlib.pyplot as plt
 
 from evaluation.metrics import diebold_mariano, twcrps, tbrier, binary_reliability, coverage, roc, brier_score, crps_ensemble, crps_quantile_decomposition, crps_expectation, quantile_loss, rank_histogram, sharpness_composite, energy_score, variogram_score, variogram_create_locality_matrix
-from evaluation.plotting_functions import plot_stratify, plot_map, plot_score, plot_reliability, plot_skill_score, plot_roc, plot_crps, plot_energy_per_y, plot_vario_per_y, plot_rank, plot_rank_per_station, plot_case, plot_distribution 
+from evaluation.plotting_functions import plot_stratify, plot_score, plot_reliability, plot_skill_score, plot_roc, plot_crps, plot_energy_per_y, plot_vario_per_y, plot_rank, plot_rank_per_station, plot_case, plot_distribution 
 
 from dataset.dataset import Dataset, load_reforecast_train, load_reforecast_valid, load_reforecast_test, reforecast_standardize, load_reforecast_data, load_forecast_data
 
@@ -29,7 +29,7 @@ prefix: str = config['variable']
 dataset_path: str = config["dataset_path"]
 output_path: str = join(config["evaluation_path"], f"{int(datetime.now(UTC).timestamp())}_{prefix}")
 model_path: str = config["output_path"]
-dataset_type: str = config['datasetType']
+dataset_type: str = config['dataset_type']
 
 station_metadata: Dict = json.load(open(join(dataset_path, 'station_metadata.json'), 'r'))
 
@@ -205,8 +205,6 @@ def accumulate(model: Dict, var: str, detensify: bool = True):
 
 
 ecmwf_baseline: torch.Tensor = [model['predictions'] for model in models if model['label'] == 'ECMWF'][0][0].sort(dim = -1)[0]
-
-print((y[~y.isnan()] > 0).sum()/(y[~y.isnan()]).numel())
 
 for model in models:
 
@@ -695,17 +693,12 @@ def _plot_distribution():
 ## ## ## ## ## ## ## ## ## ##
 
 eval_commands = [(True, _plot_crpss),
-                 (True, lambda: _plot_crpss('BQN')),
                  (True, _plot_rank),
                  (True, _plot_stratify),
-                 (True, _plot_map),
                  (True, lambda: _plot_qss(legend = False)),
-                 (True, lambda: _plot_qss('BQN', legend = False)),
                  (not True and (prefix != 'temperature'), _plot_bss),
                  (True and (prefix != 'temperature'), _plot_twcrpss),
                  (True and (prefix != 'temperature'), lambda: _plot_tbrier(legend = False)),
-                 (True and (prefix != 'temperature'), lambda: _plot_twcrpss('BQN')),
-                 (True and (prefix != 'temperature'), lambda: _plot_tbrier('BQN', legend = False)),
                  (True and (prefix != 'temperature'), _plot_reliability),
                  (True, _plot_case),
                  (not True, _plot_distribution),

@@ -3,13 +3,13 @@
 	"output_path": "",
 	"evaluation_path": "",
 
-	"train_experiment_name": "anet_temperature",
+	"train_experiment_name": "",
 	"predict_experiment_name": "",
 
 	"dataset_type": "testf",
 	"prediction_type": "joint",
 	
-	"variable": "temperature",
+	"variable": "precipitation",
 
 	"evaluation_models": 
 	[

@@ -220,8 +220,8 @@ def reforecast_standardize(target: Dataset, source: Dataset, prefix: str = "temp
         case 'temperature':
             target.y = (target.y - ymu)/ysd
         case 'precipitation' | 'wind':
-            target.y = (target.y - ymu)/ysd
-
+            target.y[target.y < 0.0] = 0.0
+            target.y = torch.log(target.y/ysd + 1.0)
         case _:
             print(f"Dataset {prefix} standardization not supported")
             exit()
